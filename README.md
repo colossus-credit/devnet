@@ -1,12 +1,27 @@
-# Builder-Playground Devnet on AWS
+# OP stack with Flashblocks Devnet on AWS
 
-Terraform configuration to deploy builder-playground opstack recipe on AWS EC2 using Docker Hub images.
+Terraform configuration to deploy OP stack with Flashblocks recipe on AWS EC2 using Docker Hub images.
 
 ## Prerequisites
 
-1. AWS CLI configured with appropriate credentials
+1. AWS CLI configured with appropriate credentials (2 options available)
+
+**Option A: AWS SSO (Recommended)**
+```bash
+brew install awscli
+aws login
+```
+
+**Option B: AWS Configure (Access Keys)**
+```bash
+brew install awscli
+aws configure
+```
+
 2. Terraform installed (>= 1.0)
-3. AWS EC2 Key Pair created for SSH access
+```bash
+brew install terraform
+```
 
 ## Setup
 
@@ -17,12 +32,18 @@ Create a `terraform.tfvars` file:
 ```hcl
 aws_region        = "us-east-1"
 instance_type     = "t3.xlarge"
-key_pair_name     = "your-key-pair-name"
-allowed_cidr      = "YOUR_IP/32"  # Your IP for SSH access
 use_spot_instance = true  # Use spot instances (60-70% cheaper, can be interrupted)
 spot_max_price    = ""  # Empty = use on-demand price as max, or set custom max (e.g., "0.10")
 flashblocks_rpc_image = "0xrampey/flashblocks-rpc:latest"  # Docker Hub image (default)
+allowed_ssh_cidr  = "YOUR_IP/32"  # Your public IP for SSH access
 ```
+
+#### SSH Key Pair
+
+Terraform automatically generates an SSH key pair:
+- **Private key:** `~/.ssh/builder-playground.pem` (mode 0400)
+- **Public key:** Deployed to EC2 instance
+- Used for SSH access to the instance
 
 ### 2. Deploy Infrastructure
 
@@ -32,56 +53,29 @@ terraform plan
 terraform apply
 ```
 
-### 3. Devnet Starts Automatically
+### 3. Devnet Starts Automatically as a Daemon
 
-The devnet will start automatically after the EC2 instance is provisioned. No manual steps required!
+The devnet starts automatically after EC2 provisioning and runs as a background daemon using `nohup`
 
-The devnet runs in the background and logs are available at `/home/ec2-user/devnet.log` on the instance.
+#### Monitoring the Devnet
 
-To check status or view logs, SSH into the instance:
+Once connected via SSH:
 
 ```bash
-# SSH into the instance (use output from terraform)
-ssh -i ~/.ssh/<key-pair>.pem ec2-user@<public-ip>
+# Check if daemon is running
+ps aux | grep "go run main.go" | grep -v grep
 
-# View devnet logs
+# View live logs
 tail -f /home/ec2-user/devnet.log
 
-# Check if devnet is running
-ps aux | grep "go run main.go"
+# Check Docker containers
+docker ps
+
+# Verify flashblocks-rpc container and ports
+docker ps | grep flashblocks-rpc
+# Should show: 0.0.0.0:8550->8545/tcp
 ```
 
-## What Terraform Does Automatically
-
-Terraform will automatically:
-- Create EC2 instance with Docker installed
-- Configure security group (ports 22 for SSH, 8550 for Flashblocks RPC)
-- Set up IAM role for EC2
-- Install Go, Git, and other dependencies
-- Clone builder-playground repository
-- Pull Docker images from Docker Hub
-- Create the run script with all overrides
-
-## What You Need to Do Manually
-
-1. **Create EC2 Key Pair** (if you don't have one):
-   ```bash
-   aws ec2 create-key-pair --key-name your-key-name --query 'KeyMaterial' --output text > ~/.ssh/your-key-name.pem
-   chmod 400 ~/.ssh/your-key-name.pem
-   ```
-
-2. **Create terraform.tfvars** with your configuration (see Setup section)
-
-3. **Run Terraform**:
-   ```bash
-   cd devnet
-   terraform init
-   terraform apply
-   ```
-
-4. **SSH into instance and start devnet** (after Terraform completes)
-
-That's it! Everything else is automated.
 
 ## Accessing Services
 
@@ -96,7 +90,7 @@ Note: Only port 8550 is exposed externally. Other services run internally on the
 When you update the Docker images on Docker Hub:
 
 1. SSH into the EC2 instance
-2. Pull the new images: `docker pull 0xrampey/flashblocks-rpc:latest` and `docker pull flashbots/flashblocks-websocket-proxy:latest`
+2. Pull the new images: `docker pull 0xrampey/flashblocks-rpc:latest`
 3. Restart the devnet: `/home/ec2-user/run-devnet.sh`
 
 ## Cleanup
@@ -105,6 +99,31 @@ To destroy all resources:
 
 ```bash
 terraform destroy
+```
+
+## Troubleshooting
+
+### Devnet Not Starting
+
+Check the cloud-init logs:
+```bash
+sudo tail -100 /var/log/cloud-init-output.log
+```
+
+Check devnet logs:
+```bash
+tail -100 /home/ec2-user/devnet.log
+```
+
+### Docker Compose Version Issues
+
+The user data script installs Docker Compose v2.23.0 as a plugin to avoid compatibility issues with v5.0.0+.
+
+If you see errors like `unknown shorthand flag: 'f' in -f`, the Docker Compose version is incompatible.
+
+Verify version:
+```bash
+docker compose version  # Should show: v2.23.0
 ```
 
 ## Spot Instances

@@ -4,21 +4,16 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "aws_profile" {
+  description = "AWS profile to use (for SSO or named profiles)"
+  type        = string
+  default     = "default"
+}
+
 variable "instance_type" {
   description = "EC2 instance type"
   type        = string
   default     = "t3.xlarge"
-}
-
-variable "key_pair_name" {
-  description = "Name of the AWS EC2 Key Pair for SSH access"
-  type        = string
-}
-
-variable "allowed_cidr" {
-  description = "CIDR block allowed to SSH into the EC2 instance"
-  type        = string
-  default     = "0.0.0.0/0" # Change this to your IP for security
 }
 
 variable "flashblocks_rpc_image" {
@@ -49,5 +44,11 @@ variable "spot_max_price" {
   description = "Maximum price per hour for spot instance (leave empty for on-demand price)"
   type        = string
   default     = "" # Empty means use on-demand price as max
+}
+
+variable "allowed_ssh_cidr" {
+  description = "CIDR block allowed for SSH access (your IP)"
+  type        = string
+  default     = "0.0.0.0/0" # Change this to your IP for security
 }
 

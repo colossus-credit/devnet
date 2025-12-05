@@ -4,11 +4,11 @@ resource "aws_security_group" "builder_playground" {
 
   # SSH access
   ingress {
-    description = "SSH from allowed CIDR"
+    description = "SSH"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [var.allowed_cidr]
+    cidr_blocks = [var.allowed_ssh_cidr]
   }
 
   # Flashblocks RPC endpoint
@@ -17,7 +17,7 @@ resource "aws_security_group" "builder_playground" {
     from_port   = 8550
     to_port     = 8550
     protocol    = "tcp"
-    cidr_blocks = [var.allowed_cidr]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   # All outbound traffic

@@ -27,7 +27,7 @@ curl -L "https://github.com/docker/compose/releases/latest/download/docker-compo
 chmod +x /usr/local/bin/docker-compose
 
 # Install Go (for building/running builder-playground)
-yum install -y golang git make
+yum install -y golang git make gcc gcc-c++ libstdc++-devel
 
 # Pull the flashblocks-rpc image from Docker Hub
 docker pull ${var.flashblocks_rpc_image} || echo "Failed to pull image, will retry later"
@@ -41,6 +41,11 @@ cd builder-playground
 git checkout ${var.builder_playground_branch}
 git pull
 
+# Set Go environment variables
+export GOPATH=/home/ec2-user/go
+export GOMODCACHE=/home/ec2-user/go/pkg/mod
+mkdir -p $GOPATH/pkg/mod
+
 # Build the Go binary (optional, can also use go run)
 go mod download
 
@@ -48,6 +53,10 @@ go mod download
 cat > /home/ec2-user/run-devnet.sh <<SCRIPT
 #!/bin/bash
 cd /home/ec2-user/builder-playground
+
+# Set Go environment variables
+export GOPATH=/home/ec2-user/go
+export GOMODCACHE=/home/ec2-user/go/pkg/mod
 
 # Pull the latest images
 docker pull ${var.flashblocks_rpc_image}
@@ -65,38 +74,28 @@ SCRIPT
 chmod +x /home/ec2-user/run-devnet.sh
 chown ec2-user:ec2-user /home/ec2-user/run-devnet.sh
 
-# Wait a bit for everything to be ready, then start the devnet automatically
-# Run as ec2-user in the background and log output
-cat > /home/ec2-user/start-devnet.sh <<'STARTSCRIPT'
-#!/bin/bash
-sleep 10  # Wait for any final setup
-cd /home/ec2-user
-sudo -u ec2-user /home/ec2-user/run-devnet.sh > /home/ec2-user/devnet.log 2>&1 &
-echo $! > /home/ec2-user/devnet.pid
-echo "Devnet started in background. PID: $(cat /home/ec2-user/devnet.pid)"
-echo "Check logs: tail -f /home/ec2-user/devnet.log"
-STARTSCRIPT
+# Wait a bit for everything to be ready, then start the devnet as a daemon
+sleep 10
 
-chmod +x /home/ec2-user/start-devnet.sh
-chown ec2-user:ec2-user /home/ec2-user/start-devnet.sh
+# Start the devnet as a proper background daemon with nohup
+nohup sudo -u ec2-user bash -c 'cd /home/ec2-user/builder-playground && export GOPATH=/home/ec2-user/go && export GOMODCACHE=/home/ec2-user/go/pkg/mod && go run main.go cook opstack --external-builder=op-rbuilder --flashblocks --enable-websocket-proxy --override flashblocks-rpc=0xrampey/flashblocks-rpc:latest --override websocket-proxy=flashbots/flashblocks-websocket-proxy:latest' > /home/ec2-user/devnet.log 2>&1 &
 
-# Start the devnet automatically
-su - ec2-user -c '/home/ec2-user/start-devnet.sh' || {
-  # If su fails, try running directly
-  cd /home/ec2-user
-  sudo -u ec2-user bash -c '/home/ec2-user/start-devnet.sh' &
-}
+# Give it time to start and stabilize
+sleep 5
+
+# Capture the actual go process PID
+ps aux | grep 'go run main.go' | grep -v grep | awk '{print $2}' > /home/ec2-user/devnet.pid
 
 # Log completion
-echo "Setup complete! Devnet is starting automatically." >> /var/log/user-data.log
-echo "Check status: tail -f /home/ec2-user/devnet.log" >> /var/log/user-data.log
+echo "Setup complete! Devnet daemon started with PID: $(cat /home/ec2-user/devnet.pid 2>/dev/null || echo 'unknown')" >> /var/log/user-data.log
+echo "View logs: tail -f /home/ec2-user/devnet.log" >> /var/log/user-data.log
 EOF
 }
 
 resource "aws_instance" "builder_playground" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = var.instance_type
-  key_name               = var.key_pair_name
+  key_name               = aws_key_pair.devnet.key_name
   vpc_security_group_ids = [aws_security_group.builder_playground.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
 
