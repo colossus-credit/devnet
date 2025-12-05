@@ -10,4 +10,6 @@ terraform/override.tf
 terraform/override.tf.json
 terraform/*_override.tf
 terraform/*_override.tf.json
-
+**/.DS_Store
+scripts/node_modules
+scripts/.env
