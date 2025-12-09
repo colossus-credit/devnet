@@ -4,18 +4,12 @@ Terraform configuration to deploy OP stack with Flashblocks recipe on AWS EC2 us
 
 ## Prerequisites
 
-1. AWS CLI configured with appropriate credentials (2 options available)
+1. AWS CLI configured with appropriate credentials
 
-**Option A: AWS SSO (Recommended)**
 ```bash
 brew install awscli
 aws login
-```
-
-**Option B: AWS Configure (Access Keys)**
-```bash
-brew install awscli
-aws configure
+eval $(aws configure export-credentials --format env)
 ```
 
 2. Terraform installed (>= 1.0)

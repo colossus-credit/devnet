@@ -20,6 +20,16 @@ resource "aws_security_group" "builder_playground" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+ # op-rbuilder Sequencer endpoint
+  ingress {
+    description = "op-rbuilder Sequencer (port 8549)"
+    from_port   = 8549
+    to_port     = 8549
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+
   # All outbound traffic
   egress {
     description = "All outbound traffic"

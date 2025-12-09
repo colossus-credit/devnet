@@ -95,7 +95,7 @@ EOF
 resource "aws_instance" "builder_playground" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = var.instance_type
-  key_name               = aws_key_pair.devnet.key_name
+  key_name               = data.aws_key_pair.devnet.key_name
   vpc_security_group_ids = [aws_security_group.builder_playground.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
 
