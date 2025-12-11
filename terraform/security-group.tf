@@ -29,6 +29,14 @@ resource "aws_security_group" "builder_playground" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+   # op-geth Sequencer endpoint
+  ingress {
+    description = "op-geth Sequencer (port 8547)"
+    from_port   = 8547
+    to_port     = 8547
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   # All outbound traffic
   egress {

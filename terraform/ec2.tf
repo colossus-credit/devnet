@@ -6,6 +6,13 @@ data "aws_ami" "amazon_linux" {
     name   = "name"
     values = ["al2023-ami-*-x86_64"]
   }
+  
+  # Pin to current AMI to prevent unwanted instance replacements
+  # Update this when you intentionally want to use a newer AMI
+  filter {
+    name   = "image-id"
+    values = ["ami-08fa3ed5577079e64"]
+  }
 }
 
 locals {
