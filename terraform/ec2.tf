@@ -74,6 +74,7 @@ go run main.go cook opstack \\
   --external-builder=op-rbuilder \\
   --flashblocks \\
   --enable-websocket-proxy \\
+  --bind-external \\
   --override flashblocks-rpc=${var.flashblocks_rpc_image} \\
   --override websocket-proxy=flashbots/flashblocks-websocket-proxy:latest
 SCRIPT
@@ -84,8 +85,8 @@ chown ec2-user:ec2-user /home/ec2-user/run-devnet.sh
 # Wait a bit for everything to be ready, then start the devnet as a daemon
 sleep 10
 
-# Start the devnet as a proper background daemon with nohup
-nohup sudo -u ec2-user bash -c 'cd /home/ec2-user/builder-playground && export GOPATH=/home/ec2-user/go && export GOMODCACHE=/home/ec2-user/go/pkg/mod && go run main.go cook opstack --external-builder=op-rbuilder --flashblocks --enable-websocket-proxy --override flashblocks-rpc=0xrampey/flashblocks-rpc:latest --override websocket-proxy=flashbots/flashblocks-websocket-proxy:latest' > /home/ec2-user/devnet.log 2>&1 &
+# Start the devnet as a proper background daemon with nohup using the script
+nohup sudo -u ec2-user /home/ec2-user/run-devnet.sh > /home/ec2-user/devnet.log 2>&1 &
 
 # Give it time to start and stabilize
 sleep 5
@@ -107,6 +108,7 @@ resource "aws_instance" "builder_playground" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
 
   user_data = local.user_data
+  user_data_replace_on_change = false  # Prevent instance replacement when user_data changes
 
   # Spot instance configuration
   dynamic "instance_market_options" {
@@ -130,5 +132,30 @@ resource "aws_instance" "builder_playground" {
   tags = {
     Name = "builder-playground-devnet"
   }
+}
+
+# Elastic IP for static public IP address
+# This IP will persist even if the instance is recreated
+resource "aws_eip" "builder_playground" {
+  domain = "vpc"
+  
+  lifecycle {
+    # Prevent accidental deletion of the Elastic IP
+    prevent_destroy = true
+  }
+  
+  tags = {
+    Name = "builder-playground-devnet-eip"
+  }
+}
+
+# Associate Elastic IP with the instance
+# This association will automatically update if the instance is recreated
+resource "aws_eip_association" "builder_playground" {
+  instance_id   = aws_instance.builder_playground.id
+  allocation_id = aws_eip.builder_playground.id
+  
+  # Ensure association happens after instance is created
+  depends_on = [aws_instance.builder_playground]
 }
 
