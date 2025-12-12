@@ -5,6 +5,8 @@ terraform/*.tfstate
 terraform/*.tfstate.*
 terraform/.terraform.tfstate.lock.info
 terraform/*.tfvars
+terraform/lambda_function.zip
+terraform/lambda_index.py
 terraform/crash.log
 terraform/override.tf
 terraform/override.tf.json

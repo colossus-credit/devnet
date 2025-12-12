@@ -52,3 +52,39 @@ variable "allowed_ssh_cidr" {
   default     = "0.0.0.0/0" # Change this to your IP for security
 }
 
+# CloudWatch Monitoring variables
+variable "enable_monitoring" {
+  description = "Enable CloudWatch monitoring and alarms"
+  type        = bool
+  default     = true
+}
+
+variable "cpu_alarm_threshold" {
+  description = "CPU utilization threshold (%) for alarm"
+  type        = number
+  default     = 80
+}
+
+variable "memory_alarm_threshold" {
+  description = "Memory utilization threshold (%) for alarm"
+  type        = number
+  default     = 85
+}
+
+variable "disk_alarm_threshold" {
+  description = "Disk utilization threshold (%) for alarm"
+  type        = number
+  default     = 80
+}
+
+variable "telegram_bot_token" {
+  description = "Telegram bot token from @BotFather"
+  type        = string
+  sensitive   = true
+}
+
+variable "telegram_chat_id" {
+  description = "Telegram chat ID for receiving alerts"
+  type        = string
+  sensitive   = true
+}

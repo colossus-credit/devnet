@@ -82,6 +82,113 @@ SCRIPT
 chmod +x /home/ec2-user/run-devnet.sh
 chown ec2-user:ec2-user /home/ec2-user/run-devnet.sh
 
+# Install and configure CloudWatch Agent
+if [ "${var.enable_monitoring}" = "true" ]; then
+  # Download CloudWatch Agent
+  wget https://s3.amazonaws.com/amazoncloudwatch-agent/amazon_linux/amd64/latest/amazon-cloudwatch-agent.rpm -P /tmp/
+  rpm -U /tmp/amazon-cloudwatch-agent.rpm
+
+  # Create CloudWatch Agent configuration
+  cat > /opt/aws/amazon-cloudwatch-agent/etc/config.json <<'CWCONFIG'
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "region": "${var.aws_region}"
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/home/ec2-user/devnet.log",
+            "log_group_name": "/aws/ec2/builder-playground/devnet",
+            "log_stream_name": "devnet.log"
+          }
+        ]
+      }
+    }
+  },
+  "metrics": {
+    "namespace": "DevnetMonitoring",
+    "append_dimensions": {
+      "InstanceId": "$${aws:InstanceId}",
+      "InstanceType": "$${aws:InstanceType}"
+    },
+    "metrics_collected": {
+      "cpu": {
+        "measurement": [
+          {
+            "name": "cpu_usage_idle",
+            "rename": "CPU_IDLE",
+            "unit": "Percent"
+          },
+          {
+            "name": "cpu_usage_iowait",
+            "rename": "CPU_IOWAIT",
+            "unit": "Percent"
+          },
+          "cpu_time_guest"
+        ],
+        "metrics_collection_interval": 60,
+        "resources": [
+          "*"
+        ],
+        "totalcpu": false
+      },
+      "disk": {
+        "measurement": [
+          {
+            "name": "used_percent",
+            "rename": "DiskUtilization",
+            "unit": "Percent"
+          },
+          {
+            "name": "inodes_free",
+            "rename": "DiskInodesFree",
+            "unit": "Count"
+          }
+        ],
+        "metrics_collection_interval": 60,
+        "resources": [
+          "/"
+        ]
+      },
+      "mem": {
+        "measurement": [
+          {
+            "name": "mem_used_percent",
+            "rename": "MemoryUtilization",
+            "unit": "Percent"
+          },
+          {
+            "name": "mem_available",
+            "rename": "MemoryAvailable",
+            "unit": "Megabytes"
+          },
+          {
+            "name": "mem_used",
+            "rename": "MemoryUsed",
+            "unit": "Megabytes"
+          }
+        ],
+        "metrics_collection_interval": 60
+      }
+    }
+  }
+}
+CWCONFIG
+
+  # Start CloudWatch Agent
+  /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+    -a fetch-config \
+    -m ec2 \
+    -s \
+    -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json
+
+  # Enable CloudWatch Agent to start on boot
+  systemctl enable amazon-cloudwatch-agent
+fi
+
 # Wait a bit for everything to be ready, then start the devnet as a daemon
 sleep 10
 
@@ -131,6 +238,11 @@ resource "aws_instance" "builder_playground" {
 
   tags = {
     Name = "builder-playground-devnet"
+  }
+
+  # Prevent Terraform from stopping/restarting spot instances to update user_data
+  lifecycle {
+    ignore_changes = [user_data]
   }
 }
 
