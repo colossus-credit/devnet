@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "Send transactions on Base Sepolia with Flashblocks pre-confirmations",
   "type": "module",
-  "main": "send-transaction.ts",
+  "main": "time_fb_txns.ts",
   "scripts": {
     "flashblocks:stream": "bun run read_fb_stream.ts",
-    "send": "bun run send-transaction.ts"
+    "flashblocks:time": "bun run time_fb_txns.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.0",
