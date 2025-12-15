@@ -14,7 +14,7 @@ Scripts for working with Flashblocks pre-confirmations using viem and custom RPC
 bun install
 ```
 
-2. Set environment variables by creating a `.env` file:
+2. Create a `.env` file with required configuration:
 ```
 PRIVATE_KEY=your_private_key_here
 RPC_URL=http://localhost:8547
@@ -29,14 +29,34 @@ AMOUNT=0.0001
 
 ### Time Flashblocks Transactions
 
-Send transactions and measure pre-confirmation timing:
+Send a transaction and measure pre-confirmation timing:
 ```bash
 bun run flashblocks:time
 ```
 
 Send multiple transactions:
 ```bash
-TX_COUNT=5 bun run flashblocks:time
+bun run flashblocks:time -- --tx-count 5
+```
+
+Use `sendTransactionSync` (sends transaction and waits for receipt in one call):
+```bash
+bun run flashblocks:time -- --use-send-txn-sync
+```
+
+With custom timing parameters:
+```bash
+bun run flashblocks:time -- --tx-count 10 --tx-interval-ms 100
+```
+
+With debug output (prints full receipts):
+```bash
+bun run flashblocks:time -- --debug
+```
+
+For all options:
+```bash
+bun run flashblocks:time -- --help
 ```
 
 ### Read Flashblocks Stream
@@ -50,13 +70,9 @@ bun run flashblocks:stream --ws-url wss://mainnet-flashblocks.unichain.org/ws --
 
 ### Transaction Timing Script (`time_fb_txns.ts`)
 
-- Sends transactions via `RPC_URL` (regular execution layer) and reads receipts via `FLASHBLOCKS_RPC_URL` (flashblocks-rpc)
-- `RPC_URL` is required - use your execution layer RPC (e.g., `http://localhost:8547` for op-geth)
-- `FLASHBLOCKS_RPC_URL` is required - use your flashblocks-rpc endpoint (e.g., `http://localhost:8550`)
-- `CHAIN_ID` defaults to 84532 (Base Sepolia) if not specified
-- The private key should not include the `0x` prefix in the environment variable (it will be added automatically)
-- Make sure your RPC endpoints support the required JSON-RPC methods
-- Flashblocks RPC provides faster pre-confirmations for reading transaction receipts
+- Sends transactions via RPC URL (regular execution layer) and reads receipts via Flashblocks RPC
+- Provides detailed timing statistics (avg, p50, p90, max)
+- Run `bun run flashblocks:time -- --help` for all options
 
 ### Stream Reader Script (`read_fb_stream.ts`)
 
