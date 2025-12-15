@@ -428,7 +428,9 @@ class FlashblocksStreamReader {
       const bd = this.blockData.get(blockNumber)!;
       bd.payloadCount++;
       bd.txCount += txCount;
-      bd.gasUsed += gasUsed;
+      // `diff.gas_used` is already a per-block running total across payloads.
+      // So for a given block, we want the last (or max) value, not a sum across payloads.
+      bd.gasUsed = Math.max(bd.gasUsed, gasUsed);
     }
 
     if (this.args.quiet) return;
@@ -444,7 +446,7 @@ class FlashblocksStreamReader {
     // eslint-disable-next-line no-console
     console.log(`   Transactions: ${txCount}`);
     // eslint-disable-next-line no-console
-    console.log(`   Gas Used: ${gasUsed.toLocaleString()}`);
+    console.log(`   Gas Used (block cumulative): ${gasUsed.toLocaleString()}`);
     // eslint-disable-next-line no-console
     console.log(`   Timestamp: ${new Date(t).toISOString().split("T")[1]}`);
     // eslint-disable-next-line no-console
