@@ -29,9 +29,10 @@ systemctl start docker
 systemctl enable docker
 usermod -a -G docker ec2-user
 
-# Install Docker Compose
-curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
+# Install Docker Compose v2 as a plugin (required by cook)
+mkdir -p /usr/libexec/docker/cli-plugins
+curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/libexec/docker/cli-plugins/docker-compose
+chmod +x /usr/libexec/docker/cli-plugins/docker-compose
 
 # Install Go (for building/running builder-playground)
 yum install -y golang git make gcc gcc-c++ libstdc++-devel
@@ -61,18 +62,23 @@ cat > /home/ec2-user/run-devnet.sh <<SCRIPT
 #!/bin/bash
 cd /home/ec2-user/builder-playground
 
+# Clean up old devnet data (may have root-owned files from Docker)
+sudo rm -rf /home/ec2-user/.playground/devnet
+
 # Set Go environment variables
 export GOPATH=/home/ec2-user/go
 export GOMODCACHE=/home/ec2-user/go/pkg/mod
 
-# Pull the latest images
+# Pull latest images
 docker pull ${var.flashblocks_rpc_image}
 docker pull flashbots/flashblocks-websocket-proxy:latest
 
 # Run the cook command
-go run main.go cook opstack \\
+go run main.go cook opstack --base-overlay \\
   --external-builder=op-rbuilder \\
+  --block-time 1 \\
   --flashblocks \\
+  --flashblocks-block-time 100 \\
   --enable-websocket-proxy \\
   --bind-external \\
   --override flashblocks-rpc=${var.flashblocks_rpc_image} \\
@@ -84,8 +90,8 @@ chown ec2-user:ec2-user /home/ec2-user/run-devnet.sh
 
 # Install and configure CloudWatch Agent
 if [ "${var.enable_monitoring}" = "true" ]; then
-  # Download CloudWatch Agent
-  wget https://s3.amazonaws.com/amazoncloudwatch-agent/amazon_linux/amd64/latest/amazon-cloudwatch-agent.rpm -P /tmp/
+  # Download CloudWatch Agent (using curl instead of wget - wget not installed by default on AL2023)
+  curl -L https://s3.amazonaws.com/amazoncloudwatch-agent/amazon_linux/amd64/latest/amazon-cloudwatch-agent.rpm -o /tmp/amazon-cloudwatch-agent.rpm
   rpm -U /tmp/amazon-cloudwatch-agent.rpm
 
   # Create CloudWatch Agent configuration
@@ -192,6 +198,10 @@ fi
 # Wait a bit for everything to be ready, then start the devnet as a daemon
 sleep 10
 
+# Create log file with proper permissions before starting devnet
+touch /home/ec2-user/devnet.log
+chown ec2-user:ec2-user /home/ec2-user/devnet.log
+
 # Start the devnet as a proper background daemon with nohup using the script
 nohup sudo -u ec2-user /home/ec2-user/run-devnet.sh > /home/ec2-user/devnet.log 2>&1 &
 
@@ -243,6 +253,18 @@ resource "aws_instance" "builder_playground" {
   # Prevent Terraform from stopping/restarting spot instances to update user_data
   lifecycle {
     ignore_changes = [user_data]
+    # Force replacement when switching between spot and on-demand instances
+    # (AWS doesn't allow changing instance market type in-place)
+    # Uses null_resource as a workaround since replace_triggered_by can't reference variables directly
+    replace_triggered_by = [null_resource.instance_market_type_trigger.id]
+  }
+}
+
+# Workaround: null_resource to trigger replacement when use_spot_instance changes
+# replace_triggered_by can only reference resources, not variables directly
+resource "null_resource" "instance_market_type_trigger" {
+  triggers = {
+    use_spot_instance = var.use_spot_instance
   }
 }
 
