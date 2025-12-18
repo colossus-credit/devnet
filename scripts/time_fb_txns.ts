@@ -210,9 +210,17 @@ async function sendOneTx(
       // eslint-disable-next-line no-console
       console.log(`  ✓ Transaction sent via sendTransactionSync: ${receipt.transactionHash} (nonce: ${nonce})`);
       
+      // Query balance using pending tag to get latest state including this transaction
+      const balance = await flashblocksClient.getBalance({ 
+        address: args.recipient as `0x${string}`,
+        blockTag: "pending",
+      });
+      
       if (args.debug) {
         // eslint-disable-next-line no-console
         console.log(`  Receipt:`, JSON.stringify(receipt, (_, v) => typeof v === "bigint" ? v.toString() : v, 2));
+        // eslint-disable-next-line no-console
+        console.log(`  Recipient balance: ${balance.toString()} wei (${(Number(balance) / 1e18).toFixed(6)} ETH)`);
       }
       
       return {
@@ -221,6 +229,7 @@ async function sendOneTx(
         submittedAtMs,
         confirmedAtMs,
         submitToReceiptMs,
+        balance,
       };
     } else {
       // Use regular sendTransaction and poll for receipt
@@ -242,9 +251,17 @@ async function sendOneTx(
         args.receiptTimeoutMs,
       );
       
+      // Query balance using pending tag to get latest state including this transaction
+      const balance = await flashblocksClient.getBalance({ 
+        address: args.recipient as `0x${string}`,
+        blockTag: "pending",
+      });
+      
       if (args.debug) {
         // eslint-disable-next-line no-console
         console.log(`  Receipt:`, JSON.stringify(receipt, (_, v) => typeof v === "bigint" ? v.toString() : v, 2));
+        // eslint-disable-next-line no-console
+        console.log(`  Recipient balance: ${balance.toString()} wei (${(Number(balance) / 1e18).toFixed(6)} ETH)`);
       }
       
       return {
@@ -253,6 +270,7 @@ async function sendOneTx(
         submittedAtMs,
         confirmedAtMs,
         submitToReceiptMs,
+        balance,
       };
     }
   } catch (error) {
@@ -324,6 +342,14 @@ async function main(): Promise<void> {
   // eslint-disable-next-line no-console
   console.log(`TX_COUNT=${args.txCount} TX_INTERVAL_MS=${args.intervalMs} POLL_INTERVAL_MS=${args.pollIntervalMs} RECEIPT_TIMEOUT_MS=${args.receiptTimeoutMs}`);
 
+  // Get initial balance to show increment (using pending to get latest state)
+  const initialBalance = await flashblocksClient.getBalance({ 
+    address: args.recipient as `0x${string}`,
+    blockTag: "pending",
+  });
+  // eslint-disable-next-line no-console
+  console.log(`Initial recipient balance: ${(Number(initialBalance) / 1e18).toFixed(6)} ETH`);
+
   try {
     const results: Array<Awaited<ReturnType<typeof sendOneTx>>> = [];
 
@@ -346,6 +372,21 @@ async function main(): Promise<void> {
       console.log(`  status: ${result.receipt.status === "success" ? "Success" : "Failed"}`);
       // eslint-disable-next-line no-console
       console.log(`  submit->receipt: ${result.submitToReceiptMs}ms`);
+      if (result.balance !== undefined) {
+        const balanceEth = Number(result.balance) / 1e18;
+        const initialBalanceEth = Number(initialBalance) / 1e18;
+        const actualIncrement = balanceEth - initialBalanceEth;
+        const expectedIncrement = parseFloat(args.amount) * (i + 1);
+        const incrementWei = result.balance - initialBalance;
+        // eslint-disable-next-line no-console
+        console.log(`  recipient balance: ${balanceEth.toFixed(6)} ETH`);
+        // eslint-disable-next-line no-console
+        console.log(`  balance increment: ${incrementWei.toString()} wei (${actualIncrement >= 0 ? '+' : ''}${actualIncrement.toFixed(9)} ETH, expected: +${expectedIncrement.toFixed(9)} ETH)`);
+        if (Math.abs(actualIncrement - expectedIncrement) > 0.000001) {
+          // eslint-disable-next-line no-console
+          console.log(`  ⚠️  Balance increment mismatch! Expected ${expectedIncrement.toFixed(9)} ETH, got ${actualIncrement.toFixed(9)} ETH`);
+        }
+      }
 
       if (args.intervalMs > 0 && i + 1 < args.txCount) {
         await sleep(args.intervalMs);

@@ -81,6 +81,7 @@ go run main.go cook opstack --base-overlay \\
   --flashblocks-block-time 100 \\
   --enable-websocket-proxy \\
   --bind-external \\
+  --log-level debug \\
   --override flashblocks-rpc=${var.flashblocks_rpc_image} \\
   --override websocket-proxy=flashbots/flashblocks-websocket-proxy:latest
 SCRIPT
