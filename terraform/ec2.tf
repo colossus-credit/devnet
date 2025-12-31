@@ -29,6 +29,19 @@ systemctl start docker
 systemctl enable docker
 usermod -a -G docker ec2-user
 
+# Configure Docker logging limits to prevent disk space issues
+sudo mkdir -p /etc/docker
+sudo tee /etc/docker/daemon.json > /dev/null <<'DOCKERLOG'
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m",
+    "max-file": "3"
+  }
+}
+DOCKERLOG
+sudo systemctl restart docker
+
 # Install Docker Compose v2 as a plugin (required by cook)
 mkdir -p /usr/libexec/docker/cli-plugins
 curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/libexec/docker/cli-plugins/docker-compose
