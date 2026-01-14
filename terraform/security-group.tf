@@ -38,6 +38,15 @@ resource "aws_security_group" "builder_playground" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # Websocket proxy endpoint
+  ingress {
+    description = "Websocket Proxy (port 1115)"
+    from_port   = 1115
+    to_port     = 1115
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   # All outbound traffic
   egress {
     description = "All outbound traffic"
